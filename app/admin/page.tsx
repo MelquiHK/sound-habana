@@ -44,16 +44,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Header } from "@/components/header"
 import { ImageUpload } from "@/components/image-upload"
-import { useAuth, type Order } from "@/context/auth-context"
+import { useAuth } from "@/context/auth-context"
+import type { Order, OrderItem } from "@/lib/database.types"
 import { getProducts, saveProducts, getCategories, saveCategories, type Product, type Category } from "@/lib/products"
 import { getBlogPosts, saveBlogPosts, type BlogPost } from "@/lib/blog"
 import { getSiteContent, saveSiteContent, type SiteContent } from "@/lib/site-content"
 
 const statusConfig = {
-  pendiente: { label: "Pendiente", color: "bg-yellow-500/20 text-yellow-600 border-yellow-500/30", icon: Clock },
-  confirmado: { label: "Confirmado", color: "bg-blue-500/20 text-blue-600 border-blue-500/30", icon: CheckCircle },
-  entregado: { label: "Entregado", color: "bg-green-500/20 text-green-600 border-green-500/30", icon: Truck },
-  cancelado: { label: "Cancelado", color: "bg-red-500/20 text-red-600 border-red-500/30", icon: XCircle },
+  pending: { label: "Pendiente", color: "bg-yellow-500/20 text-yellow-600 border-yellow-500/30", icon: Clock },
+  confirmed: { label: "Confirmado", color: "bg-blue-500/20 text-blue-600 border-blue-500/30", icon: CheckCircle },
+  shipped: { label: "Entregado", color: "bg-green-500/20 text-green-600 border-green-500/30", icon: Truck },
+  delivered: { label: "Entregado", color: "bg-green-500/20 text-green-600 border-green-500/30", icon: Truck },
+  cancelled: { label: "Cancelado", color: "bg-red-500/20 text-red-600 border-red-500/30", icon: XCircle },
 }
 
 export default function AdminPage() {
@@ -157,15 +159,16 @@ export default function AdminPage() {
 
   // Pedidos
   const handleContactCustomer = (order: Order) => {
-    const shippingText = order.shippingCost
-      ? `\n\n📦 *Costo de envio:* $${order.shippingCost.toLocaleString()} CUP\n💰 *Total final:* $${(order.total + order.shippingCost).toLocaleString()} CUP`
+    const shippingText = order.shipping_cost
+      ? `\n\n📦 *Costo de envio:* $${order.shipping_cost.toLocaleString()} CUP\n💰 *Total final:* $${(order.total + order.shipping_cost).toLocaleString()} CUP`
       : ""
+
     const itemsList = order.items
-      .map((item) => `• ${item.name} x${item.quantity} - $${(item.price * item.quantity).toLocaleString()}`)
+      .map((item: OrderItem) => `• ${item.name} x${item.quantity} - $${(item.price * item.quantity).toLocaleString()}`)
       .join("\n")
 
-    const message = `Hola ${order.customer.name}! Soy de *Habana Sound* 🎧\n\nTe contacto sobre tu pedido #${order.id.slice(-6).toUpperCase()}.\n\n*Productos:*\n${itemsList}\n\n*Subtotal:* $${order.total.toLocaleString()} CUP${shippingText}`
-    const phone = order.customer.phone.replace(/[^0-9]/g, "")
+    const message = `Hola ${order.customer_name}! Soy de *Habana Sound* 🎧\n\nTe contacto sobre tu pedido #${order.id.slice(-6).toUpperCase()}.\n\n*Productos:*\n${itemsList}\n\n*Subtotal:* $${order.total.toLocaleString()} CUP${shippingText}`
+    const phone = order.customer_phone.replace(/[^0-9]/g, "")
     const whatsappUrl = `https://wa.me/${phone.startsWith("53") ? phone : "53" + phone}?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, "_blank")
   }
@@ -178,10 +181,10 @@ export default function AdminPage() {
     }
   }
 
-  const pendingOrders = allOrders.filter((o) => o.status === "pendiente").length
+  const pendingOrders = allOrders.filter((o) => o.status === "pending").length
   const totalRevenue = allOrders
-    .filter((o) => o.status !== "cancelado")
-    .reduce((sum, o) => sum + o.total + (o.shippingCost || 0), 0)
+    .filter((o) => o.status !== "cancelled")
+    .reduce((sum, o) => sum + o.total + (o.shipping_cost || 0), 0)
 
   if (isLoading || !user?.isAdmin) {
     return (
@@ -217,7 +220,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-foreground">Panel de Administrador</h1>
-                <p className="text-muted-foreground">Bienvenido, {user.username}</p>
+                <p className="text-muted-foreground">Bienvenido, {user.name}</p>
               </div>
             </div>
           </motion.div>
@@ -317,7 +320,7 @@ export default function AdminPage() {
                 <div className="grid gap-4">
                   <AnimatePresence>
                     {allOrders
-                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                       .map((order, i) => {
                         const StatusIcon = statusConfig[order.status].icon
                         return (
@@ -343,7 +346,7 @@ export default function AdminPage() {
                                           </Badge>
                                         </div>
                                         <p className="text-sm text-muted-foreground">
-                                          {new Date(order.date).toLocaleDateString("es-ES", {
+                                          {new Date(order.created_at).toLocaleDateString("es-ES", {
                                             weekday: "long",
                                             year: "numeric",
                                             month: "long",
@@ -357,9 +360,9 @@ export default function AdminPage() {
                                         <p className="text-lg font-bold text-primary">
                                           ${order.total.toLocaleString()} CUP
                                         </p>
-                                        {order.shippingCost && (
+                                        {order.shipping_cost && (
                                           <p className="text-sm text-muted-foreground">
-                                            + ${order.shippingCost.toLocaleString()} envio
+                                            + ${order.shipping_cost.toLocaleString()} envio
                                           </p>
                                         )}
                                       </div>
@@ -368,20 +371,20 @@ export default function AdminPage() {
                                     <div className="bg-secondary/50 rounded-xl p-4 space-y-2">
                                       <div className="flex items-center gap-2 text-sm">
                                         <User className="w-4 h-4 text-primary" />
-                                        <span className="font-medium">{order.customer.name}</span>
+                                        <span className="font-medium">{order.customer_name}</span>
                                       </div>
                                       <div className="flex items-center gap-2 text-sm">
                                         <Phone className="w-4 h-4 text-primary" />
-                                        <span>{order.customer.phone}</span>
+                                        <span>{order.customer_phone}</span>
                                       </div>
                                       <div className="flex items-start gap-2 text-sm">
                                         <MapPin className="w-4 h-4 text-primary mt-0.5" />
-                                        <span>{order.customer.address}</span>
+                                        <span>{order.customer_address}</span>
                                       </div>
-                                      {order.customer.notes && (
+                                      {order.customer_notes && (
                                         <div className="flex items-start gap-2 text-sm text-muted-foreground">
                                           <MessageCircle className="w-4 h-4 mt-0.5" />
-                                          <span>{order.customer.notes}</span>
+                                          <span>{order.customer_notes}</span>
                                         </div>
                                       )}
                                     </div>
@@ -423,10 +426,11 @@ export default function AdminPage() {
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="pendiente">Pendiente</SelectItem>
-                                        <SelectItem value="confirmado">Confirmado</SelectItem>
-                                        <SelectItem value="entregado">Entregado</SelectItem>
-                                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                                        <SelectItem value="pending">Pendiente</SelectItem>
+                                        <SelectItem value="confirmed">Confirmado</SelectItem>
+                                        <SelectItem value="shipped">Enviado</SelectItem>
+                                        <SelectItem value="delivered">Entregado</SelectItem>
+                                        <SelectItem value="cancelled">Cancelado</SelectItem>
                                       </SelectContent>
                                     </Select>
 
@@ -435,7 +439,7 @@ export default function AdminPage() {
                                       <Input
                                         type="number"
                                         placeholder="0"
-                                        value={shippingOrderId === order.id ? shippingCost : order.shippingCost || ""}
+                                        value={shippingOrderId === order.id ? shippingCost : order.shipping_cost || ""}
                                         onChange={(e) => {
                                           setShippingOrderId(order.id)
                                           setShippingCost(e.target.value)
@@ -460,7 +464,7 @@ export default function AdminPage() {
                                       variant="outline"
                                       className="w-full gap-2 bg-transparent"
                                       onClick={() => {
-                                        const phone = order.customer.phone.replace(/[^0-9]/g, "")
+                                        const phone = order.customer_phone.replace(/[^0-9]/g, "")
                                         window.open(`tel:${phone}`, "_self")
                                       }}
                                     >
@@ -627,10 +631,10 @@ export default function AdminPage() {
                       <CardContent className="p-4 flex items-center justify-between">
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-lg">
-                            {u.username.charAt(0).toUpperCase()}
+                            {u.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <h3 className="font-semibold text-foreground">{u.username}</h3>
+                            <h3 className="font-semibold text-foreground">{u.name}</h3>
                             <p className="text-sm text-muted-foreground">
                               {u.email || "Sin email"} • {u.phone || "Sin telefono"}
                             </p>

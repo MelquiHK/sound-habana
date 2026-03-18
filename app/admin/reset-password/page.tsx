@@ -19,6 +19,11 @@ export default function ResetPasswordPage() {
   const supabase = useMemo(() => createClient(), [])
 
   const handleResetPassword = async () => {
+    if (!supabase) {
+      setError("Supabase no está configurado. Contacta con el administrador.")
+      return
+    }
+
     setLoading(true)
     setMessage("")
     setError("")

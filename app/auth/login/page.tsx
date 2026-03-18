@@ -63,7 +63,7 @@ export default function LoginPage() {
         <Card className="border-0 shadow-2xl">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
-              <AnimatedLogo size="medium" />
+              <AnimatedLogo size="large" />
             </div>
             <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
             <CardDescription>Ingresa a tu cuenta de Habana Sound</CardDescription>

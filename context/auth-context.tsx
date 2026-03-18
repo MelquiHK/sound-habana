@@ -53,17 +53,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isFirstVisit, setIsFirstVisit] = useState(false)
 
   const supabase = useMemo(() => createClient(), [])
+  const supabaseEnabled = Boolean(supabase)
 
   // Cargar usuario al iniciar
   useEffect(() => {
+    if (!supabaseEnabled) {
+      console.warn("[v0] Supabase no está configurado. Se desactiva la autenticación basada en Supabase.")
+      setIsLoading(false)
+      return
+    }
+
+    const supabaseClient = supabase
+    if (!supabaseClient) {
+      setIsLoading(false)
+      return
+    }
+
     const loadUser = async () => {
       try {
         const {
           data: { user: authUser },
-        } = await supabase.auth.getUser()
+        } = await supabaseClient.auth.getUser()
 
         if (authUser) {
-          const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", authUser.id).single()
+          const { data: profile, error } = await supabaseClient.from("profiles").select("*").eq("id", authUser.id).single()
 
           if (error) {
             console.error("[v0] Error loading profile:", error)
@@ -107,9 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Escuchar cambios de autenticación
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session?.user) {
-        const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+        const { data: profile } = await supabaseClient.from("profiles").select("*").eq("id", session.user.id).single()
 
         if (profile) {
           setUser({
@@ -138,6 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const loadUserOrders = async (userId: string) => {
+    if (!supabase) return
+
     const { data } = await supabase
       .from("orders")
       .select("*")
@@ -148,12 +163,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const loadAllOrders = async () => {
+    if (!supabase) return
+
     const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false })
 
     if (data) setAllOrders(data)
   }
 
   const loadAllUsers = async () => {
+    if (!supabase) return
+
     const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false })
 
     if (data) {
@@ -171,6 +190,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
+    if (!supabase) {
+      return { success: false, error: "Supabase no está configurado. Contacta con el administrador." }
+    }
+
     try {
       console.log("[v0] Attempting login for:", email)
 
@@ -243,6 +266,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const register = async (name: string, email: string, password: string, phone: string) => {
+    if (!supabase) {
+      return { success: false, error: "Supabase no está configurado. Contacta con el administrador." }
+    }
+
     try {
       console.log("[v0] Attempting registration for:", email)
 
@@ -292,6 +319,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
+    if (!supabase) {
+      setUser(null)
+      setOrders([])
+      setAllOrders([])
+      setUsers([])
+      return
+    }
+
     await supabase.auth.signOut()
     setUser(null)
     setOrders([])
@@ -300,6 +335,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const addOrder = async (order: Omit<Order, "id" | "created_at" | "updated_at">) => {
+    if (!supabase) return
+
     const { data, error } = await supabase.from("orders").insert(order).select().single()
 
     if (data && !error) {
@@ -311,6 +348,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const updateOrderStatus = async (orderId: string, status: Order["status"]) => {
+    if (!supabase) return
+
     await supabase.from("orders").update({ status }).eq("id", orderId)
 
     setAllOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)))
@@ -318,6 +357,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const updateOrderShipping = async (orderId: string, shippingCost: number) => {
+    if (!supabase) return
+
     const order = allOrders.find((o) => o.id === orderId)
     if (!order) return
 
@@ -329,25 +370,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const deleteOrder = async (orderId: string) => {
+    if (!supabase) return
+
     await supabase.from("orders").delete().eq("id", orderId)
     setAllOrders((prev) => prev.filter((o) => o.id !== orderId))
     setOrders((prev) => prev.filter((o) => o.id !== orderId))
   }
 
   const clearAllOrders = async () => {
+    if (!supabase) return
+
     await supabase.from("orders").delete().neq("id", "00000000-0000-0000-0000-000000000000")
     setAllOrders([])
     setOrders([])
   }
 
   const clearUserOrders = async () => {
-    if (!user) return
+    if (!supabase || !user) return
+
     await supabase.from("orders").delete().eq("user_id", user.id)
     setOrders([])
     await loadAllOrders()
   }
 
   const deleteUser = async (userId: string) => {
+    if (!supabase) return
+
     // Eliminar pedidos del usuario primero
     await supabase.from("orders").delete().eq("user_id", userId)
     // Eliminar perfil (el trigger eliminará el auth user)
@@ -357,11 +405,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const updateUser = async (userId: string, data: Partial<Profile>) => {
+    if (!supabase) return
+
     await supabase.from("profiles").update(data).eq("id", userId)
     await loadAllUsers()
   }
 
   const makeAdmin = async (userId: string) => {
+    if (!supabase) return
+
     await supabase.from("profiles").update({ role: "admin" }).eq("id", userId)
     await loadAllUsers()
   }

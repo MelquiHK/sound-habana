@@ -63,7 +63,7 @@ export default function LoginPage() {
       return
     }
 
-    const success = await register(regUsername, regPassword, regEmail)
+    const success = await register(regUsername, regEmail, regPassword, "")
 
     if (success) {
       router.push("/")

@@ -42,10 +42,13 @@ export default function PerfilPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "confirmado":
+      case "confirmed":
         return "bg-primary/20 text-primary"
-      case "entregado":
+      case "shipped":
+      case "delivered":
         return "bg-green-500/20 text-green-500"
+      case "cancelled":
+        return "bg-red-500/20 text-red-500"
       default:
         return "bg-yellow-500/20 text-yellow-500"
     }
@@ -76,7 +79,7 @@ export default function PerfilPage() {
                       <User className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <h2 className="text-2xl">{user.username}</h2>
+                      <h2 className="text-2xl">{user.name}</h2>
                       {user.email && <p className="text-sm text-muted-foreground font-normal">{user.email}</p>}
                     </div>
                     {user.isAdmin && <Badge className="ml-auto">Administrador</Badge>}
@@ -122,7 +125,7 @@ export default function PerfilPage() {
                           <div className="flex justify-between items-start mb-4">
                             <div>
                               <p className="text-sm text-muted-foreground">Pedido #{order.id.slice(-8)}</p>
-                              <p className="text-sm text-muted-foreground">{formatDate(order.date)}</p>
+                              <p className="text-sm text-muted-foreground">{formatDate(order.created_at)}</p>
                             </div>
                             <Badge className={getStatusColor(order.status)}>
                               {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
