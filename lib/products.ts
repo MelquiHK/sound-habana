@@ -1,3 +1,5 @@
+import { createClient } from "@/lib/supabase/client"
+
 export interface Product {
   id: string
   name: string
@@ -15,6 +17,109 @@ export interface Category {
   name: string
   icon: string
   description: string
+}
+
+export async function getProductsFromSupabase(): Promise<Product[]> {
+  const supabase = createClient()
+  if (!supabase) return []
+
+  const { data, error } = await supabase.from("products").select("*")
+
+  if (error) {
+    console.error("[v0] Error fetching products from Supabase:", error)
+    return []
+  }
+
+  if (!data) return []
+
+  return data.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    price: Number(row.price),
+    images: row.images || [],
+    category: row.category,
+    specs: row.specs || [],
+    useCases: row.useCases || [],
+    inStock: row.inStock,
+  }))
+}
+
+export async function saveProductsToSupabase(products: Product[]) {
+  const supabase = createClient()
+  if (!supabase) return
+
+  const upserts = products.map((product) => ({
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    images: product.images,
+    category: product.category,
+    specs: product.specs,
+    useCases: product.useCases,
+    inStock: product.inStock,
+  }))
+
+  const { error } = await supabase.from("products").upsert(upserts)
+
+  if (error) {
+    console.error("[v0] Error saving products to Supabase:", error)
+  }
+}
+
+export async function deleteProductFromSupabase(id: string) {
+  const supabase = createClient()
+  if (!supabase) return
+
+  const { error } = await supabase.from("products").delete().eq("id", id)
+
+  if (error) {
+    console.error("[v0] Error deleting product from Supabase:", error)
+  }
+}
+
+export async function getCategoriesFromSupabase(): Promise<Category[]> {
+  const supabase = createClient()
+  if (!supabase) return []
+
+  const { data, error } = await supabase.from("categories").select("*")
+
+  if (error) {
+    console.error("[v0] Error fetching categories from Supabase:", error)
+    return []
+  }
+
+  if (!data) return []
+
+  return data.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    icon: row.icon,
+    description: row.description,
+  }))
+}
+
+export async function saveCategoriesToSupabase(categories: Category[]) {
+  const supabase = createClient()
+  if (!supabase) return
+
+  const { error } = await supabase.from("categories").upsert(categories)
+
+  if (error) {
+    console.error("[v0] Error saving categories to Supabase:", error)
+  }
+}
+
+export async function deleteCategoryFromSupabase(id: string) {
+  const supabase = createClient()
+  if (!supabase) return
+
+  const { error } = await supabase.from("categories").delete().eq("id", id)
+
+  if (error) {
+    console.error("[v0] Error deleting category from Supabase:", error)
+  }
 }
 
 export function getCategories(): Category[] {

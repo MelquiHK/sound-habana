@@ -78,25 +78,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (authUser) {
           const { data: profile, error } = await supabaseClient.from("profiles").select("*").eq("id", authUser.id).single()
 
-          if (error) {
+          if (error && error.code !== "PGRST116") {
+            // PGRST116 no data found (PostgREST) es esperado si perfil no existe
             console.error("[v0] Error loading profile:", error)
           }
 
-          if (profile) {
+          let effectiveProfile = profile
+
+          if (!effectiveProfile) {
+            // Crear perfil de fallback si no existe
+            const defaultName = authUser.user_metadata?.name || authUser.email?.split("@")[0] || "Usuario"
+            const defaultPhone = authUser.user_metadata?.phone || ""
+            const role = "customer"
+
+            const { data: createdProfile, error: createError } = await supabaseClient.from("profiles").upsert({
+              id: authUser.id,
+              name: defaultName,
+              phone: defaultPhone,
+              email: authUser.email,
+              role,
+            })
+
+            if (createError) {
+              console.error("[v0] Error creating fallback profile:", createError)
+            }
+
+            effectiveProfile = createdProfile?.[0]
+          }
+
+          if (effectiveProfile) {
             setUser({
-              id: profile.id,
-              name: profile.name,
-              email: profile.email,
-              phone: profile.phone,
-              isAdmin: profile.role === "admin",
-              createdAt: profile.created_at,
+              id: effectiveProfile.id,
+              name: effectiveProfile.name,
+              email: effectiveProfile.email,
+              phone: effectiveProfile.phone,
+              isAdmin: effectiveProfile.role === "admin",
+              createdAt: effectiveProfile.created_at,
             })
 
             // Cargar pedidos del usuario
-            await loadUserOrders(profile.id)
+            await loadUserOrders(effectiveProfile.id)
 
             // Si es admin, cargar todos los pedidos y usuarios
-            if (profile.role === "admin") {
+            if (effectiveProfile.role === "admin") {
               await loadAllOrders()
               await loadAllUsers()
             }
@@ -122,19 +146,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session?.user) {
-        const { data: profile } = await supabaseClient.from("profiles").select("*").eq("id", session.user.id).single()
+        const { data: profile, error } = await supabaseClient.from("profiles").select("*").eq("id", session.user.id).single()
 
-        if (profile) {
-          setUser({
-            id: profile.id,
-            name: profile.name,
-            email: profile.email,
-            phone: profile.phone,
-            isAdmin: profile.role === "admin",
-            createdAt: profile.created_at,
+        let effectiveProfile = profile
+        if (error && error.code !== "PGRST116") {
+          console.error("[v0] Error loading profile on auth change:", error)
+        }
+
+        if (!effectiveProfile) {
+          const userMeta = session.user.user_metadata || {}
+          const defaultName = userMeta.name || session.user.email?.split("@")[0] || "Usuario"
+          const defaultPhone = userMeta.phone || ""
+
+          const { data: createdProfile, error: createError } = await supabaseClient.from("profiles").upsert({
+            id: session.user.id,
+            name: defaultName,
+            phone: defaultPhone,
+            email: session.user.email,
+            role: "customer",
           })
-          await loadUserOrders(profile.id)
-          if (profile.role === "admin") {
+
+          if (createError) {
+            console.error("[v0] Error creating profile on auth change:", createError)
+          }
+
+          effectiveProfile = createdProfile?.[0]
+        }
+
+        if (effectiveProfile) {
+          setUser({
+            id: effectiveProfile.id,
+            name: effectiveProfile.name,
+            email: effectiveProfile.email,
+            phone: effectiveProfile.phone,
+            isAdmin: effectiveProfile.role === "admin",
+            createdAt: effectiveProfile.created_at,
+          })
+          await loadUserOrders(effectiveProfile.id)
+          if (effectiveProfile.role === "admin") {
             await loadAllOrders()
             await loadAllUsers()
           }

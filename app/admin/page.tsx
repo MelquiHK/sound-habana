@@ -46,7 +46,20 @@ import { Header } from "@/components/header"
 import { ImageUpload } from "@/components/image-upload"
 import { useAuth } from "@/context/auth-context"
 import type { Order, OrderItem } from "@/lib/database.types"
-import { getProducts, saveProducts, getCategories, saveCategories, type Product, type Category } from "@/lib/products"
+import {
+  getProducts,
+  saveProducts,
+  getCategories,
+  saveCategories,
+  type Product,
+  type Category,
+  getProductsFromSupabase,
+  saveProductsToSupabase,
+  deleteProductFromSupabase,
+  getCategoriesFromSupabase,
+  saveCategoriesToSupabase,
+  deleteCategoryFromSupabase,
+} from "@/lib/products"
 import { getBlogPosts, saveBlogPosts, type BlogPost } from "@/lib/blog"
 import { getSiteContent, saveSiteContent, type SiteContent } from "@/lib/site-content"
 
@@ -84,14 +97,37 @@ export default function AdminPage() {
   }, [user, isLoading, router])
 
   useEffect(() => {
-    setProducts(getProducts())
-    setCategories(getCategories())
-    setBlogPosts(getBlogPosts())
-    setSiteContent(getSiteContent())
+    const loadData = async () => {
+      try {
+        const supaProducts = await getProductsFromSupabase()
+        const supaCategories = await getCategoriesFromSupabase()
+
+        if (supaProducts.length > 0) {
+          setProducts(supaProducts)
+        } else {
+          setProducts(getProducts())
+        }
+
+        if (supaCategories.length > 0) {
+          setCategories(supaCategories)
+        } else {
+          setCategories(getCategories())
+        }
+      } catch (error) {
+        console.error("[v0] Error loading admin data from Supabase:", error)
+        setProducts(getProducts())
+        setCategories(getCategories())
+      }
+
+      setBlogPosts(getBlogPosts())
+      setSiteContent(getSiteContent())
+    }
+
+    loadData()
   }, [])
 
   // Productos
-  const handleSaveProduct = (product: Product) => {
+  const handleSaveProduct = async (product: Product) => {
     let updatedProducts: Product[]
     if (products.find((p) => p.id === product.id)) {
       updatedProducts = products.map((p) => (p.id === product.id ? product : p))
@@ -100,18 +136,20 @@ export default function AdminPage() {
     }
     setProducts(updatedProducts)
     saveProducts(updatedProducts)
+    await saveProductsToSupabase(updatedProducts)
     setEditingProduct(null)
     setIsProductDialogOpen(false)
   }
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = async (id: string) => {
     const updatedProducts = products.filter((p) => p.id !== id)
     setProducts(updatedProducts)
     saveProducts(updatedProducts)
+    await deleteProductFromSupabase(id)
   }
 
   // Categorias
-  const handleSaveCategory = (category: Category) => {
+  const handleSaveCategory = async (category: Category) => {
     let updatedCategories: Category[]
     if (categories.find((c) => c.id === category.id)) {
       updatedCategories = categories.map((c) => (c.id === category.id ? category : c))
@@ -120,14 +158,16 @@ export default function AdminPage() {
     }
     setCategories(updatedCategories)
     saveCategories(updatedCategories)
+    await saveCategoriesToSupabase(updatedCategories)
     setEditingCategory(null)
     setIsCategoryDialogOpen(false)
   }
 
-  const handleDeleteCategory = (id: string) => {
+  const handleDeleteCategory = async (id: string) => {
     const updatedCategories = categories.filter((c) => c.id !== id)
     setCategories(updatedCategories)
     saveCategories(updatedCategories)
+    await deleteCategoryFromSupabase(id)
   }
 
   // Blog

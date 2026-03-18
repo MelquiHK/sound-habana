@@ -4,10 +4,33 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { categories, getProducts } from "@/lib/products"
+import { useEffect, useState } from "react"
+import { getProducts, getProductsFromSupabase, getCategories, getCategoriesFromSupabase, type Category, type Product } from "@/lib/products"
 
 export default function CategoriasPage() {
-  const products = getProducts()
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+
+  useEffect(() => {
+    const loadData = async () => {
+      const supaProducts = await getProductsFromSupabase()
+      const supaCategories = await getCategoriesFromSupabase()
+
+      if (supaProducts.length > 0) {
+        setProducts(supaProducts)
+      } else {
+        setProducts(getProducts())
+      }
+
+      if (supaCategories.length > 0) {
+        setCategories(supaCategories)
+      } else {
+        setCategories(getCategories())
+      }
+    }
+
+    loadData()
+  }, [])
 
   const getCategoryCount = (categoryId: string) => {
     return products.filter((p) => p.category === categoryId).length

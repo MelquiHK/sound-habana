@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -9,14 +9,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { ProductCard } from "@/components/product-card"
-import { getProducts, categories } from "@/lib/products"
+import { getProducts, getProductsFromSupabase, getCategories, getCategoriesFromSupabase, type Product, type Category } from "@/lib/products"
 
 export default function ProductosPage() {
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [sortBy, setSortBy] = useState("name")
+  const [products, setProducts] = useState<Product[]>([])
+  const [categoryList, setCategoryList] = useState<Category[]>([])
 
-  const products = getProducts()
+  useEffect(() => {
+    const loadData = async () => {
+      const supaProducts = await getProductsFromSupabase()
+      const supaCategories = await getCategoriesFromSupabase()
+
+      if (supaProducts.length > 0) {
+        setProducts(supaProducts)
+      } else {
+        setProducts(getProducts())
+      }
+
+      if (supaCategories.length > 0) {
+        setCategoryList(supaCategories)
+      } else {
+        setCategoryList(getCategories())
+      }
+    }
+
+    loadData()
+  }, [])
 
   const filteredProducts = useMemo(() => {
     let result = products
@@ -84,7 +105,7 @@ export default function ProductosPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las categorías</SelectItem>
-                {categories.map((cat) => (
+                {categoryList.map((cat: any) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     {cat.name}
                   </SelectItem>
